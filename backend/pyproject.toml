@@ -3,9 +3,12 @@ name = "archon-backend"
 version = "0.1.0"
 description = "Backend for Archon - AI Engineering Architect"
 requires-python = ">=3.12,<3.13"
-dependencies = ["pydantic",
+dependencies = [
+    "pydantic",
     "langgraph",
     "langchain",
     "langchain-groq",
     "fastapi",
-    "uvicorn",]
+    "uvicorn",
+    "python-dotenv",
+]
