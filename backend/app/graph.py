@@ -1,30 +1,28 @@
 from langgraph.graph import StateGraph,START,END
-from app.state import Requirements,ArchonState
-
-def requirements_node(state: ArchonState):
-    requirements = Requirements(
-        functional_requirements=["Answer customer questions"],
-        non_functional_requirements=["Low latency"],
-        constraints=["Limited budget"],
-    )
-
-    return {"requirements": requirements}
+from app.state import ArchonState
+from app.agents import (supervisor_node,requirements_node,technology_node,critic_node,finalizer_node,human_node)
 
 graph = StateGraph(ArchonState)
 
-graph.add_node("requirements", requirements_node)
+graph.add_node('supervisor',supervisor_node,destinations=("requirements",
+        "technology",
+        "critic",
+        "finalizer",
+        "human",))
 
-graph.add_edge(START, "requirements")
-graph.add_edge("requirements", END)
+graph.add_node('requirements',requirements_node)
+graph.add_node('technology',technology_node)
+graph.add_node('critic',critic_node)
+graph.add_node('finalizer',finalizer_node)
+graph.add_node('human',human_node)
+
+graph.add_edge(START,'supervisor')
 
 app = graph.compile()
 
-if __name__ == "__main__":
-    initial_state = ArchonState(
-        user_goal="Build an AI customer-support system"
-    )
+
+if __name__ == '__main__':
+    initial_state = ArchonState(user_goal='Build AN AI customer care system')
 
     result = app.invoke(initial_state)
-
     print(result)
- 
