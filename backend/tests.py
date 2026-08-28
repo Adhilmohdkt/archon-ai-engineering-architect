@@ -1,16 +1,21 @@
-from app.llm import requirements_architecture_model
+from cerebras.cloud.sdk import Cerebras
+from dotenv import load_dotenv
+import os
 
-result = requirements_architecture_model.invoke(
-    """
-    Build an AI customer-support system.
+load_dotenv()
 
-    Identify:
-    - functional requirements
-    - non-functional requirements
-    - constraints
-
-    Then propose an appropriate architecture based on those requirements.
-    """
+client = Cerebras(
+    api_key=os.getenv("CEREBRAS_API_KEY")
 )
 
-print(result)
+response = client.chat.completions.create(
+    model="gpt-oss-120b",
+    messages=[
+        {
+            "role": "user",
+            "content": "Say hello in one sentence."
+        }
+    ],
+)
+
+print(response.choices[0].message.content)

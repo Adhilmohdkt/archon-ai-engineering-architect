@@ -3,8 +3,6 @@ from app.state import ArchonState
 from langgraph.types import Command
 
 def supervisor_node(state: ArchonState):
-    print("START: Supervisor")
-
     prompt = f"""
 You are the Supervisor of Archon, an AI engineering architecture system.
 
@@ -61,19 +59,16 @@ Choose the next_agent dynamically based on the current state and
 the routing rules. Do not always choose the same agent.
 """
 
-    print("calling supervisor")
+    
 
     decision = supervisor_model.invoke(prompt)
-
-    print("finished supervisor")
-    print("Supervisor decision:", decision)
 
     return Command(
         goto=decision.next_agent
     )
 
 def requirements_architecture_node(state: ArchonState):
-    print("START: Requirements + Architecture")
+    
     prompt = f"""
         You are Archon's Requirements and Architecture Agent.
 
@@ -96,9 +91,9 @@ def requirements_architecture_node(state: ArchonState):
         - Ensure the architecture addresses the identified requirements and constraints.
         - Return the result using the provided structured output schema.
         """
-    print("Calling Gemini for Requirements...")
+    
     result = requirements_architecture_model.invoke(prompt)
-    print("Gemini Requirements returned")
+   
     return Command(update={
         "requirements": result.requirements,
         "architecture": result.architecture,
@@ -139,13 +134,13 @@ def technology_node(state: ArchonState):
 
         Return the recommendations using the provided structured output schema.
         """
-     print('calling technology')
+    
      result = technologyrecommendations_model.invoke(prompt)
-     print('finished technology')
+     
      
      return Command(
         update={
-            "technology_recommendations": result
+            "technologyrecommendations": result
         },
         goto="supervisor",
       )
