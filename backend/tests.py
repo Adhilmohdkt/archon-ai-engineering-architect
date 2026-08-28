@@ -1,14 +1,16 @@
-from app.llm import supervisor_model
+from app.llm import requirements_architecture_model
 
-decision = supervisor_model.invoke(
+result = requirements_architecture_model.invoke(
     """
-    You are the supervisor of an AI engineering architecture system.
+    Build an AI customer-support system.
 
-    The user has provided a project goal, but no requirements or
-    architecture have been created yet.
+    Identify:
+    - functional requirements
+    - non-functional requirements
+    - constraints
 
-    Decide which agent should work next.
+    Then propose an appropriate architecture based on those requirements.
     """
 )
 
-print(decision)
+print(result)

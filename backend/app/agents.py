@@ -1,57 +1,154 @@
-from app.llm import supervisor_model
+from app.llm import (supervisor_model,requirements_architecture_model,technologyrecommendations_model)
 from app.state import ArchonState
 from langgraph.types import Command
 
-def supervisor_node(state : ArchonState):
-    prompt = f""" You are an supervisor of Archon  which is an AI engineering architecture system.
+def supervisor_node(state: ArchonState):
+    print("START: Supervisor")
 
-    Your job is to decide which aregent should work next based on the current state
+    prompt = f"""
+You are the Supervisor of Archon, an AI engineering architecture system.
 
-    Current state:
+Your job is to decide which agent should work next based on the current state.
 
-    User goal:
-    {state.user_goal}
+Current state:
 
-    Requirements:
-    {state.requirements}
+User goal:
+{state.user_goal}
 
-    Architecture:
-    {state.architecture}
+Requirements:
+{state.requirements}
 
-    Technology recommendations:
-    {state.technologyrecommendations}
+Architecture:
+{state.architecture}
 
-    Critique:
-    {state.critique}
+Technology recommendations:
+{state.technologyrecommendations}
 
-    Revision count:
-    {state.revision_count}
+Critique:
+{state.critique}
 
-    Routing rules:
-    - If requirements or architecture are missing, choose "requirements".
-    - If requirements and architecture are complete but technology
-    recommendations are missing, choose "technology".
-    - If technology recommendations are complete and there is no critique,
-    choose "critic".
-    - If the critic rejected the design, choose the agent specified by
-    critique.target_agent.
-    - If the critic approved the design, choose "finalizer".
-    - If the revision limit has been reached, choose "human".
+Revision count:
+{state.revision_count}
 
-    Return the appropriate next agent and a concise reason.
-    """
+
+Routing rules:
+
+1. If requirements or architecture are missing, choose "requirements".
+
+2. If requirements and architecture are complete but
+   technology recommendations are missing, choose "technology".
+
+3. If requirements, architecture, and technology recommendations
+   are complete and there is no critique, choose "critic".
+
+4. If the critic rejected the design, choose the agent specified by
+   critique.target_agent.
+
+5. If the critic approved the design, choose "finalizer".
+
+6. If the revision limit has been reached, choose "human".
+
+
+Return ONLY a valid JSON object containing:
+
+- next_agent
+- reason
+
+The next_agent value MUST be exactly one of:
+"requirements", "technology", "critic", "finalizer", "human".
+
+Choose the next_agent dynamically based on the current state and
+the routing rules. Do not always choose the same agent.
+"""
+
+    print("calling supervisor")
+
     decision = supervisor_model.invoke(prompt)
 
-    return Command(goto=decision.next_agent)
+    print("finished supervisor")
+    print("Supervisor decision:", decision)
 
-def requirements_node(state: ArchonState):
-    print("Requirements Agent")
-    return {}
+    return Command(
+        goto=decision.next_agent
+    )
+
+def requirements_architecture_node(state: ArchonState):
+    print("START: Requirements + Architecture")
+    prompt = f"""
+        You are Archon's Requirements and Architecture Agent.
+
+        The user's goal is:
+
+        {state.user_goal}
+
+        Your job is to:
+
+        1. Identify the functional requirements.
+        2. Identify the non-functional requirements.
+        3. Identify the constraints.
+        4. Design an appropriate software architecture based on those requirements,
+        including the major components and how data flows between them.
+        5. Explain why the proposed architecture is appropriate.
+        Important:
+        - Do not blindly assume unnecessary features.
+        - Keep the architecture proportional to the user's goal.
+        - If important information is missing, make reasonable assumptions.
+        - Ensure the architecture addresses the identified requirements and constraints.
+        - Return the result using the provided structured output schema.
+        """
+    print("Calling Gemini for Requirements...")
+    result = requirements_architecture_model.invoke(prompt)
+    print("Gemini Requirements returned")
+    return Command(update={
+        "requirements": result.requirements,
+        "architecture": result.architecture,
+    },goto = 'supervisor')
+
 
 
 def technology_node(state: ArchonState):
-    print("Technology Agent")
-    return {}
+     print("START: Technology")
+     prompt = f"""
+        You are Archon's Technology Recommendation Agent.
+
+        The user's goal is:
+
+        {state.user_goal}
+
+        The identified requirements are:
+
+        {state.requirements}
+
+        The proposed architecture is:
+
+        {state.architecture}
+
+        Your job is to recommend appropriate technologies for this system.
+
+        Consider:
+        - The functional requirements
+        - The non-functional requirements
+        - The constraints
+        - The proposed architecture
+        - Cost and operational complexity
+        - Scalability and maintainability
+        - Suitable alternatives and their trade-offs
+
+        Do not recommend technologies simply because they are popular.
+        Choose technologies that are appropriate for this specific system.
+
+        Return the recommendations using the provided structured output schema.
+        """
+     print('calling technology')
+     result = technologyrecommendations_model.invoke(prompt)
+     print('finished technology')
+     
+     return Command(
+        update={
+            "technology_recommendations": result
+        },
+        goto="supervisor",
+      )
 
 
 def critic_node(state: ArchonState):

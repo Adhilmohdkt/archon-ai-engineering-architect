@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph,START,END
 from app.state import ArchonState
-from app.agents import (supervisor_node,requirements_node,technology_node,critic_node,finalizer_node,human_node)
+from app.agents import (supervisor_node,requirements_architecture_node,technology_node,critic_node,finalizer_node,human_node)
 
 graph = StateGraph(ArchonState)
 
@@ -10,13 +10,14 @@ graph.add_node('supervisor',supervisor_node,destinations=("requirements",
         "finalizer",
         "human",))
 
-graph.add_node('requirements',requirements_node)
+graph.add_node('requirements',requirements_architecture_node)
 graph.add_node('technology',technology_node)
 graph.add_node('critic',critic_node)
 graph.add_node('finalizer',finalizer_node)
 graph.add_node('human',human_node)
 
 graph.add_edge(START,'supervisor')
+
 
 app = graph.compile()
 
