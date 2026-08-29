@@ -1,21 +1,19 @@
-from cerebras.cloud.sdk import Cerebras
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
+from tavily import TavilyClient
 
 load_dotenv()
 
-client = Cerebras(
-    api_key=os.getenv("CEREBRAS_API_KEY")
+client = TavilyClient(
+    api_key=os.getenv("TAVILY_API_KEY")
 )
 
-response = client.chat.completions.create(
-    model="gpt-oss-120b",
-    messages=[
-        {
-            "role": "user",
-            "content": "Say hello in one sentence."
-        }
-    ],
+response = client.search(
+    query="best vector databases for production RAG",
+    max_results=5,
 )
 
-print(response.choices[0].message.content)
+for result in response["results"]:
+    print("\nTITLE:", result["title"])
+    print("URL:", result["url"])
+    print("CONTENT:", result["content"][:500])

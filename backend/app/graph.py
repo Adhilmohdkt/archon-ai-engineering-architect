@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph,START,END
 from app.state import ArchonState
 from app.agents import (supervisor_node,requirements_architecture_node,technology_node,critic_node,finalizer_node,human_node)
-
+import asyncio
 graph = StateGraph(ArchonState)
 
 graph.add_node('supervisor',supervisor_node,destinations=("requirements",
@@ -25,5 +25,5 @@ app = graph.compile()
 if __name__ == '__main__':
     initial_state = ArchonState(user_goal='Build AN AI customer care system')
 
-    result = app.invoke(initial_state)
+    result = asyncio.run(app.ainvoke(initial_state))
     print(result)

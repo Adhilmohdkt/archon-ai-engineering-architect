@@ -1,6 +1,10 @@
-from app.llm import (supervisor_model,requirements_architecture_model,technologyrecommendations_model)
+from app.llm import (supervisor_model,requirements_architecture_model,technologyrecommendations_model,cloudfare_model)
 from app.state import ArchonState
 from langgraph.types import Command
+from langgraph.prebuilt import ToolNode
+from langchain_core.messages import HumanMessage
+from mcp_server.mcp_tools import get_mcp_tools
+import asyncio
 
 def supervisor_node(state: ArchonState):
     prompt = f"""
@@ -101,49 +105,88 @@ def requirements_architecture_node(state: ArchonState):
 
 
 
-def technology_node(state: ArchonState):
-     print("START: Technology")
-     prompt = f"""
-        You are Archon's Technology Recommendation Agent.
+async def technology_node(state: ArchonState):
+    print("START: Technology")
 
-        The user's goal is:
+    # Load MCP tools
+    tools = await get_mcp_tools()
 
-        {state.user_goal}
+    # Give the tools to Gemma
+    model_with_tools = cloudfare_model.bind_tools(tools)
 
-        The identified requirements are:
+    prompt = f"""
+    You are Archon's Technology Recommendation Agent.
 
-        {state.requirements}
+    The user's goal is:
 
-        The proposed architecture is:
+    {state.user_goal}
 
-        {state.architecture}
+    The identified requirements are:
 
-        Your job is to recommend appropriate technologies for this system.
+    {state.requirements}
 
-        Consider:
-        - The functional requirements
-        - The non-functional requirements
-        - The constraints
-        - The proposed architecture
-        - Cost and operational complexity
-        - Scalability and maintainability
-        - Suitable alternatives and their trade-offs
+    The proposed architecture is:
 
-        Do not recommend technologies simply because they are popular.
-        Choose technologies that are appropriate for this specific system.
+    {state.architecture}
 
-        Return the recommendations using the provided structured output schema.
-        """
+    Your job is to recommend appropriate technologies for this system.
+
+    Consider:
+    - The functional requirements
+    - The non-functional requirements
+    - The constraints
+    - The proposed architecture
+    - Cost and operational complexity
+    - Scalability and maintainability
+    - Suitable alternatives and their trade-offs
+
+    Before making your technology recommendations, you MUST
+    use the websearch tool to research current technology options
+    and trade-offs.
+
+    You must perform at least one web search before producing
+    your recommendations.
+
+    Do not recommend technologies simply because they are popular.
+    Choose technologies that are appropriate for this specific system.
+    """
+
+    messages = [HumanMessage(content=prompt)]
+
+    # Ask the LLM whether it needs to use a tool
+    response = await model_with_tools.ainvoke(messages)
     
-     result = technologyrecommendations_model.invoke(prompt)
-     
-     
-     return Command(
+
+    # If the LLM requested a tool, execute it
+    if response.tool_calls:
+
+        tool_node = ToolNode(tools)
+
+        messages.append(response)
+
+        tool_result = await tool_node.ainvoke({
+            "messages": messages
+        })
+
+        messages.extend(tool_result["messages"])
+
+        # Give the search results back to the LLM
+        response = await model_with_tools.ainvoke(messages)
+        
+
+    # Convert the final response into our structured schema
+    result = await technologyrecommendations_model.ainvoke(
+        messages
+    )
+
+    print("Technology recommendations generated")
+
+    return Command(
         update={
             "technologyrecommendations": result
         },
         goto="supervisor",
-      )
+    )
 
 
 def critic_node(state: ArchonState):
