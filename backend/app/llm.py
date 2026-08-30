@@ -1,7 +1,10 @@
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_cloudflare import ChatCloudflareWorkersAI
-from app.models import (SupervisorDecision,RequirementsArchitectureOutput,TechnologyRecommendations)
+from app.models import (SupervisorDecision,
+                        RequirementsArchitectureOutput,
+                        TechnologyRecommendations,
+                        Critique)
 
 load_dotenv()
 
@@ -19,3 +22,5 @@ cloudfare_model = ChatCloudflareWorkersAI(model = "@cf/google/gemma-4-26b-a4b-it
 requirements_architecture_model = cloudfare_model.with_structured_output(RequirementsArchitectureOutput)
 
 technologyrecommendations_model = cloudfare_model.with_structured_output(TechnologyRecommendations)
+
+critic_model = groq_model.with_structured_output(Critique)
