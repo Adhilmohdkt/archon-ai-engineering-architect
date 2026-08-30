@@ -17,6 +17,7 @@ graph.add_node('finalizer',finalizer_node)
 graph.add_node('human',human_node)
 
 graph.add_edge(START,'supervisor')
+graph.add_edge('finalizer',END)
 
 
 app = graph.compile()
