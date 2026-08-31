@@ -23,4 +23,4 @@ requirements_architecture_model = cloudfare_model.with_structured_output(Require
 
 technologyrecommendations_model = cloudfare_model.with_structured_output(TechnologyRecommendations)
 
-critic_model = groq_model.with_structured_output(Critique)
+critic_model = groq_model.with_structured_output(Critique,method = "json_schema")

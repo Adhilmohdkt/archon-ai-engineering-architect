@@ -181,7 +181,6 @@ Make sure every required field in the schema is populated.
             "requirements": result.requirements,
             "architecture": result.architecture,
             "critique": None,
-            "human_feedback": None,
         },
         goto="supervisor"
     )
@@ -382,7 +381,7 @@ Return the complete structured result.
         update={
             "technologyrecommendations": result,
             "critique": None,
-            "human_feedback": None,
+        
         },
         goto="supervisor",
     )
@@ -597,12 +596,15 @@ However, do not reject a technically sound design simply because
 the human requested a preference that has been reasonably
 implemented.
 
-Return the result using the provided structured output schema.
+Return the result as valid JSON using the provided structured output schema.
+
+The response must be a valid JSON object.
 """
 
     result = critic_model.invoke(prompt)
 
     print("Critique generated")
+
 
     if result.revision_required:
 
