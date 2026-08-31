@@ -1,12 +1,14 @@
 from app.llm import (supervisor_model,requirements_architecture_model,technologyrecommendations_model,
                      cloudfare_model,critic_model,groq_model)
 from app.state import ArchonState
-from langgraph.types import Command
+from app.models import Critique
+from langgraph.types import (Command,interrupt)
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import HumanMessage
 from mcp_server.mcp_tools import get_mcp_tools
+from langgraph.graph import END
 import asyncio
-MAX_REVISION = 3
+MAX_REVISION = 1
 
 def supervisor_node(state: ArchonState):
     print(" starting supervisor")
@@ -93,13 +95,43 @@ Previous architecture:
 Critic feedback:
 {state.critique}
 
+Human feedback:
+{state.human_feedback}
+
+
 Your task is to produce the requirements and architecture for the
 user's specific goal.
 
 If Critic feedback is present, revise the previous design by
 addressing the issues identified by the Critic.
 
+If Human feedback is present, treat it as additional guidance
+provided by a human reviewer.
+
+The human may provide:
+- A new requirement
+- A clarification
+- An architectural preference
+- A constraint
+- A concern about the existing design
+- A suggestion for changing or improving the architecture
+
+Carefully evaluate the human's feedback against the user's goal,
+requirements, constraints, architecture, and Critic feedback.
+
+Do not blindly accept the human's suggestion.
+
+If the suggestion is appropriate and consistent with the system's
+goals and constraints, incorporate it into the revised design.
+
+If the suggestion conflicts with the requirements, constraints,
+or technical consistency of the system, use your reasoning to
+determine the appropriate approach.
+
 If Critic feedback is None, create the initial design.
+
+If Human feedback is None, continue normally without human guidance.
+
 
 Identify:
 
@@ -109,14 +141,17 @@ Identify:
 4. Appropriate architecture style
 5. Major architecture components
 6. Data flow between the components
-7. A clear reason explaining why the proposed architecture is appropriate
-   for the user's requirements and constraints.
+7. A clear reason explaining why the proposed architecture is
+   appropriate for the user's requirements and constraints.
+
 
 The architecture output MUST contain all four fields:
+
 - architecture_style
 - components
 - data_flow
 - reason
+
 
 Important:
 
@@ -129,7 +164,9 @@ Important:
 - Ensure every major component has a purpose.
 - Ensure the data flow actually uses the proposed components.
 - If Critic feedback is present, address all relevant issues.
+- If Human feedback is present, address relevant human guidance.
 - Preserve valid parts of the previous design when appropriate.
+- Do not make unnecessary changes to a working design.
 
 Return a complete result using the provided structured output schema.
 Make sure every required field in the schema is populated.
@@ -138,13 +175,16 @@ Make sure every required field in the schema is populated.
     result = requirements_architecture_model.invoke(prompt)
 
     print("Finished Requirements agent")
-   
-    return Command(update={
-        "requirements": result.requirements,
-        "architecture": result.architecture,
-        'critique':None
-    },goto = 'supervisor')
 
+    return Command(
+        update={
+            "requirements": result.requirements,
+            "architecture": result.architecture,
+            "critique": None,
+            "human_feedback": None,
+        },
+        goto="supervisor"
+    )
 
 
 async def technology_node(state: ArchonState):
@@ -174,9 +214,13 @@ Current technology recommendations:
 
 {state.technologyrecommendations}
 
-Critic feedback from the previous iteration:
+Critic feedback:
 
 {state.critique}
+
+Human feedback:
+
+{state.human_feedback}
 
 
 Your job is to recommend appropriate technologies for this system.
@@ -204,8 +248,46 @@ identified by the Critic.
 Preserve valid technology choices where appropriate.
 Do not replace technologies unnecessarily.
 
+
+Human feedback handling:
+
+If Human feedback is provided, treat it as additional guidance
+from a human reviewer.
+
+The human may suggest:
+
+- A specific technology
+- An alternative technology
+- A change to the architecture
+- A constraint or preference
+- A concern about cost, security, scalability, or implementation
+
+Carefully evaluate the human's suggestion against:
+
+- The user's goal
+- The requirements
+- The architecture
+- The constraints
+- The Critic's feedback
+- Technical feasibility
+
+Do not blindly accept the human's suggestion.
+
+If the suggestion is technically appropriate, incorporate it
+into the technology recommendations.
+
+If the suggestion conflicts with the requirements, constraints,
+architecture, or technical correctness, do not blindly follow it.
+Use your technical reasoning to determine the appropriate solution.
+
+If Human feedback is None, continue normally without human guidance.
+
+
 If no Critic feedback is provided, this is the initial technology
 recommendation.
+
+If no Human feedback is provided, this is not a human-guided
+revision.
 
 
 Web research:
@@ -220,7 +302,8 @@ your recommendations.
 Do not recommend technologies simply because they are popular.
 
 Choose technologies based on the specific requirements,
-architecture, constraints, and current information.
+architecture, constraints, human guidance, and current
+information.
 """
 
     messages = [HumanMessage(content=prompt)]
@@ -259,8 +342,12 @@ Architecture:
 Critic feedback:
 {state.critique}
 
+Human feedback:
+{state.human_feedback}
+
 Technology recommendation produced after research:
 {response.content}
+
 
 Make sure ALL required fields are populated:
 
@@ -275,6 +362,13 @@ requirements and architecture.
 If Critic feedback is present, ensure the revised recommendations
 address the relevant issues identified by the Critic.
 
+If Human feedback is present, ensure that relevant human guidance
+has been considered in the final technology recommendations.
+
+Do not blindly accept human suggestions if they conflict with
+the requirements, constraints, architecture, or technical
+correctness.
+
 Return the complete structured result.
 """
 
@@ -287,7 +381,8 @@ Return the complete structured result.
     return Command(
         update={
             "technologyrecommendations": result,
-            "critique": None
+            "critique": None,
+            "human_feedback": None,
         },
         goto="supervisor",
     )
@@ -314,9 +409,13 @@ Architecture:
 Technology recommendations:
 {state.technologyrecommendations}
 
+Human feedback:
+{state.human_feedback}
+
 
 Before deciding whether to approve the design, perform the following
 verification checks.
+
 
 1. FUNCTIONAL REQUIREMENT COVERAGE
 
@@ -410,9 +509,44 @@ Look specifically for cases where:
 - an important constraint is ignored
 
 
+7. HUMAN FEEDBACK VERIFICATION
+
+Human feedback:
+{state.human_feedback}
+
+If human feedback is None:
+
+- No human intervention has occurred.
+- Do not perform any human-feedback-specific evaluation.
+
+If human feedback is present:
+
+- Identify the specific change, preference, or concern requested
+  by the human.
+- Check whether the revised Requirements, Architecture, or
+  Technology recommendations actually address that feedback.
+- Check whether the requested change was implemented correctly.
+- Check whether the change remains consistent with the user's
+  requirements, constraints, and overall architecture.
+- Do not automatically approve the design simply because it
+  follows the human's request.
+- Do not reject the design merely because the human's preferred
+  technology differs from your own preference.
+- If the human feedback has been properly addressed and the
+  resulting design remains technically sound, consider the
+  human feedback satisfied.
+- If the human feedback was ignored, partially addressed,
+  incorrectly implemented, or introduces a significant
+  contradiction, create an issue describing the problem.
+
+When human feedback is present, the Critic must explicitly verify
+that the revised design reflects the human's requested change.
+
+
 IMPORTANT APPROVAL RULES:
 
 - Evaluate against THIS user's goal and identified requirements.
+- Consider human feedback when it is present.
 - Do not compare the design against an ideal or perfect production
   architecture.
 - Do not reject the design merely because optional improvements
@@ -421,15 +555,18 @@ IMPORTANT APPROVAL RULES:
   reasonably implied by the user's goal.
 - Minor omissions should not cause rejection.
 - Only reject when there is a significant issue that affects the
-  correctness, feasibility, requirements coverage, or consistency
-  of the design.
+  correctness, feasibility, requirements coverage, consistency,
+  or requested human change.
+- Do not create an issue just to appear critical.
+- The goal is to detect real problems, not to maximize the number
+  of issues.
 
 
 After completing all checks, decide whether a revision is actually
 necessary.
 
-If the design adequately satisfies the important requirements
-and constraints:
+If the design adequately satisfies the important requirements,
+constraints, and any applicable human feedback:
 
 approved = true
 revision_required = false
@@ -453,10 +590,12 @@ or
 
 IMPORTANT:
 
-Do not create an issue just to appear critical.
+When human feedback is present, do not approve the design unless
+the requested change has been adequately addressed.
 
-The goal is to detect real problems, not to maximize the number
-of issues.
+However, do not reject a technically sound design simply because
+the human requested a preference that has been reasonably
+implemented.
 
 Return the result using the provided structured output schema.
 """
@@ -559,4 +698,37 @@ Write the final blueprint in clear Markdown.
 
 def human_node(state: ArchonState):
     print("Human intervention required")
-    return {}
+
+    human_response = interrupt({
+        "message": "Human intervention required",
+        "user_goal": state.user_goal,
+        "requirements" : state.requirements.model_dump(),
+        'Architecture' : state.architecture.model_dump(),
+        'technologyrecommendations':(
+            state.technologyrecommendations.model_dump()
+        ),
+        'critique':state.critique.model_dump(),
+    })
+
+    decision = human_response['decision']
+    feedback = human_response.get('feedback')
+
+    if decision == 'approve':
+        return Command(update={'human_feedback': feedback},
+                       goto='finalizer')
+
+    elif decision == 'revise':
+        return Command(update={'human_feedback':feedback,
+                               'revision_count' : 0},
+                       goto = state.critique.target_agent)
+
+    elif decision =='reject':
+        return Command(update={'human_feedback':feedback},
+                       goto= END)
+    else:
+
+        raise ValueError(
+            "Invalid human decision. "
+            "Expected 'approve', 'revise', or 'reject'."
+        )
+ 
