@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage
 from mcp_server.mcp_tools import get_mcp_tools
 from langgraph.graph import END
 import asyncio
-MAX_REVISION = 1
+MAX_REVISION = 3
 
 def supervisor_node(state: ArchonState):
     print(" starting supervisor")
