@@ -18,9 +18,7 @@ class HumanResumeRequest(BaseModel):
 class ArchonResponse(BaseModel):
 
     thread_id : str
-    status : Literal['running',
-                     '"human_review_required"',
-                     'rejected',
+    status : Literal[ "human_review_required",
                      'completed']
     user_goal: str | None = None
 

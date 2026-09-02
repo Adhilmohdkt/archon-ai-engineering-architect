@@ -8,73 +8,54 @@ from langchain_core.messages import HumanMessage
 from mcp_server.mcp_tools import get_mcp_tools
 from langgraph.graph import END
 import asyncio
-MAX_REVISION = 3
+MAX_REVISION = 1
 
 def supervisor_node(state: ArchonState):
-    print(" starting supervisor")
+    print("Starting supervisor")
 
-    if state.revision_count >= MAX_REVISION:
-        print('Human intervention needed ')
-        return Command(goto='human')
+   
+    if state.requirements is None or state.architecture is None:
+        print("Routing to requirements agent")
+        return Command(goto="requirements")
+
     
-    prompt = f"""
-    You are the Supervisor of Archon, an AI engineering architecture system.
+    if state.technologyrecommendations is None:
+        print("Routing to technology agent")
+        return Command(goto="technology")
 
-    Your job is to decide which agent should work next based on the current state.
+    # 3. Everything exists, but critic hasn't evaluated it yet
+    if state.critique is None:
+        print("Routing to critic")
+        return Command(goto="critic")
 
-    Current state:
+    
+    if state.critique.approved:
+        print("Design approved → finalizer")
+        return Command(goto="finalizer")
 
-    User goal:
-    {state.user_goal}
+    
+    if state.critique.revision_required:
 
-    Requirements:
-    {state.requirements}
+       
+        if state.revision_count >= MAX_REVISION:
+            print("Revision limit reached → human intervention")
+            return Command(goto="human")
 
-    Architecture:
-    {state.architecture}
+        
+        print(
+            f"Revision allowed → {state.critique.target_agent}"
+        )
 
-    Technology recommendations:
-    {state.technologyrecommendations}
+        return Command(
+            update={
+                "revision_count": state.revision_count + 1
+            },
+            goto=state.critique.target_agent
+        )
 
-    Critique:
-    {state.critique}
-
-    Revision count:
-    {state.revision_count}
-
-    Routing rules:
-
-    1. If requirements or architecture are missing, choose "requirements".
-
-    2. If requirements and architecture are complete but
-       technology recommendations are missing, choose "technology".
-
-    3. If requirements, architecture, and technology recommendations
-       are complete and there is no critique, choose "critic".
-
-    4. If the critic rejected the design, choose the agent specified by
-       critique.target_agent.
-
-    5. If the critic approved the design, choose "finalizer".
-
-    Return ONLY a valid JSON object containing:
-
-    - next_agent
-    - reason
-
-    The next_agent value MUST be exactly one of:
-    "requirements", "technology", "critic", "finalizer", "human".
-
-    Choose the next_agent dynamically based on the current state.
-    """
-
-    decision = supervisor_model.invoke(prompt)
-
-    print("Supervisor finished")
-
-    return Command(
-        goto=decision.next_agent
-    )
+    
+    print("Unexpected supervisor state → human intervention")
+    return Command(goto="human")
 
 def requirements_architecture_node(state: ArchonState):
 
