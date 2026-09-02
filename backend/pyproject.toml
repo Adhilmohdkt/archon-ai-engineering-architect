@@ -14,8 +14,9 @@ dependencies = [
     "python-dotenv",
     "langchain-google-genai",
     'tavily-python',
-    "fastmcp",
-     'langchain-mcp-adapters',
+    "fastmcp==3.4.7",
+     'langchain-mcp-adapters==0.3.2',
+     'mcp==1.29.1',
 ]
 [tool.setuptools.packages.find]
 include = ["app*", "mcp_server*"]

@@ -696,18 +696,32 @@ def human_node(state: ArchonState):
     decision = human_response['decision']
     feedback = human_response.get('feedback')
 
-    if decision == 'approve':
-        return Command(update={'human_feedback': feedback},
-                       goto='finalizer')
+    if decision == "approve":
+     return Command(
+        update={
+            "human_decision": "approve",
+            "human_feedback": feedback
+        },
+        goto="finalizer"
+    )
 
-    elif decision == 'revise':
-        return Command(update={'human_feedback':feedback,
-                               'revision_count' : 0},
-                       goto = state.critique.target_agent)
+    elif decision == "revise":
+     return Command(
+        update={
+            "human_decision": "revise",
+            "human_feedback": feedback
+        },
+        goto=state.critique.target_agent
+    )
 
-    elif decision =='reject':
-        return Command(update={'human_feedback':feedback},
-                       goto= END)
+    elif decision == "reject":
+      return Command(
+        update={
+            "human_decision": "reject",
+            "human_feedback": feedback
+        },
+        goto=END
+    )
     else:
 
         raise ValueError(

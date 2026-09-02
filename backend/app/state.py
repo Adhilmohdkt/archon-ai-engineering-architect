@@ -13,6 +13,7 @@ class ArchonState(BaseModel):
     technologyrecommendations : TechnologyRecommendations | None = None
     critique : Critique | None = None
     revision_count : int = 0
+    human_decision: str | None = None
     human_feedback : str | None = None
     final_blueprint : str | None = None
 
