@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage
 from mcp_server.mcp_tools import get_mcp_tools
 from langgraph.graph import END
 import asyncio
-MAX_REVISION = 1
+MAX_REVISION = 3
 
 def supervisor_node(state: ArchonState):
     print("Starting supervisor")
@@ -305,9 +305,13 @@ information.
         # Give the search results back to the LLM
         response = await model_with_tools.ainvoke(messages)
 
+
     # Convert only the final technology response into our schema
     structured_prompt = f"""
-Convert the following technology recommendation into the
+You are the final Technology Recommendation formatter for Archon.
+
+Convert the technology recommendation produced by the previous agent
+into a complete JSON object that strictly follows the
 TechnologyRecommendations schema.
 
 User goal:
@@ -329,27 +333,56 @@ Technology recommendation produced after research:
 {response.content}
 
 
-Make sure ALL required fields are populated:
+The output MUST be a JSON object with EXACTLY these required fields:
 
-- recommendations
-- alternatives
-- trade_offs
-- reason
+{{
+    "recommendations": {{
+        "technology_or_component": "recommended technology"
+    }},
+    "alternatives": {{
+        "technology_or_component": [
+            "alternative 1",
+            "alternative 2"
+        ]
+    }},
+    "trade_offs": {{
+        "technology_or_component": "trade-offs of the recommendation versus alternatives"
+    }},
+    "reason": "overall explanation for why these technologies are appropriate"
+}}
 
-The recommendations must be appropriate for the user's specific
-requirements and architecture.
+ALL FOUR fields are mandatory:
 
-If Critic feedback is present, ensure the revised recommendations
-address the relevant issues identified by the Critic.
+1. recommendations
+   - Provide the recommended technology for each major system component.
 
-If Human feedback is present, ensure that relevant human guidance
-has been considered in the final technology recommendations.
+2. alternatives
+   - Provide reasonable alternatives for the relevant technology choices.
 
-Do not blindly accept human suggestions if they conflict with
-the requirements, constraints, architecture, or technical
-correctness.
+3. trade_offs
+   - Explain the important trade-offs for the technology decisions.
+   - This field MUST NOT be omitted.
 
-Return the complete structured result.
+4. reason
+   - Explain why the recommended technologies are appropriate for
+     the user's requirements and architecture.
+   - This field MUST NOT be omitted.
+
+Do not return only recommendations and alternatives.
+
+Even if the research response does not explicitly contain trade-offs
+or a reason, derive them from the requirements, architecture,
+constraints, and researched technology information.
+
+If Critic feedback is present, ensure the recommendations address
+the issues identified by the Critic.
+
+If Human feedback is present, consider it carefully, but do not
+blindly accept suggestions that conflict with requirements,
+constraints, architecture, or technical correctness.
+
+Return ONLY the complete JSON object.
+Do not return explanations, Markdown, code fences, or additional text.
 """
 
     result = await technologyrecommendations_model.ainvoke(

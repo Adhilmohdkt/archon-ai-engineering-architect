@@ -17,10 +17,10 @@ supervisor_model = groq_model.with_structured_output(SupervisorDecision,method="
 
 
 cloudfare_model = ChatCloudflareWorkersAI(model = "@cf/google/gemma-4-26b-a4b-it"
-                                      ,temperature = 0)
+                                      ,temperature = 0,max_tokens=4096)
 
 requirements_architecture_model = cloudfare_model.with_structured_output(RequirementsArchitectureOutput)
 
-technologyrecommendations_model = cloudfare_model.with_structured_output(TechnologyRecommendations)
+technologyrecommendations_model = cloudfare_model.with_structured_output(TechnologyRecommendations,method='json_schema')
 
 critic_model = groq_model.with_structured_output(Critique,method = "json_schema")
