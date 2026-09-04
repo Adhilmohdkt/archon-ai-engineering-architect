@@ -17,6 +17,8 @@ dependencies = [
     "fastmcp==3.4.7",
      'langchain-mcp-adapters==0.3.2',
      'mcp==1.29.1',
+     'langchain-mistralai',
+     "deepeval",
 ]
 [tool.setuptools.packages.find]
 include = ["app*", "mcp_server*"]

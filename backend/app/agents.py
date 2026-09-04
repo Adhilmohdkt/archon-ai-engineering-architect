@@ -1,5 +1,5 @@
 from app.llm import (supervisor_model,requirements_architecture_model,technologyrecommendations_model,
-                     cloudfare_model,critic_model,groq_model)
+                     cloudfare_model,critic_model,groq_model,mistral_model)
 from app.state import ArchonState
 from app.models import Critique
 from langgraph.types import (Command,interrupt)
@@ -173,7 +173,7 @@ async def technology_node(state: ArchonState):
 
     tools = await get_mcp_tools()
 
-    model_with_tools = cloudfare_model.bind_tools(tools)
+    model_with_tools = mistral_model.bind_tools(tools)
 
     prompt = f"""
 You are Archon's Technology Recommendation Agent.
