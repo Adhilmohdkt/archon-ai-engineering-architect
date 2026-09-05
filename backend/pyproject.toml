@@ -19,6 +19,8 @@ dependencies = [
      'mcp==1.29.1',
      'langchain-mistralai',
      "deepeval",
+     "httpx",
+     "pytest",
 ]
 [tool.setuptools.packages.find]
 include = ["app*", "mcp_server*"]
