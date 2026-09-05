@@ -1,88 +1,63 @@
 import os
 
 from dotenv import load_dotenv
-from langchain_mistralai import ChatMistralAI
-
+from langchain_groq import ChatGroq
 from deepeval.models.base_model import DeepEvalBaseLLM
 
-
-# ============================================================
-# LOAD ENVIRONMENT
-# ============================================================
 
 load_dotenv()
 
 
 # ============================================================
-# MISTRAL API KEY
+# GROQ JUDGE MODEL
 # ============================================================
 
-mistral_api_key = os.getenv("MISTRAL_API_KEY")
+groq_api_key = os.getenv("GROQ_API_KEY")
 
-if not mistral_api_key:
+if not groq_api_key:
     raise ValueError(
-        "MISTRAL_API_KEY not found in .env"
+        "GROQ_API_KEY not found in .env"
     )
 
 
-# ============================================================
-# MISTRAL MODEL
-# ============================================================
-
-mistral_model = ChatMistralAI(
-    model="mistral-small-latest",
-    api_key=mistral_api_key,
+groq_model = ChatGroq(
+    model="openai/gpt-oss-120b",
+    api_key=groq_api_key,
     temperature=0,
 )
 
 
 # ============================================================
-# DEEPEVAL JUDGE ADAPTER
+# DEEPEVAL MODEL ADAPTER
 # ============================================================
 
-class MistralJudge(DeepEvalBaseLLM):
+class GroqJudge(DeepEvalBaseLLM):
 
     def __init__(self, model):
         self.model = model
 
-
     def load_model(self):
         return self.model
 
+    def generate(self, prompt: str) -> str:
 
-    def generate(
-        self,
-        prompt: str,
-    ) -> str:
-
-        response = self.model.invoke(
-            prompt
-        )
+        response = self.model.invoke(prompt)
 
         return response.content
 
+    async def a_generate(self, prompt: str) -> str:
 
-    async def a_generate(
-        self,
-        prompt: str,
-    ) -> str:
-
-        response = await self.model.ainvoke(
-            prompt
-        )
+        response = await self.model.ainvoke(prompt)
 
         return response.content
-
 
     def get_model_name(self):
 
-        return "Mistral Small"
+        return "Groq GPT-OSS-120B"
 
 
 # ============================================================
 # JUDGE INSTANCE
 # ============================================================
 
-judge = MistralJudge(
-    mistral_model
-)
+judge = GroqJudge(groq_model)
