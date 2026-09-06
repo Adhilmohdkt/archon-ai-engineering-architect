@@ -22,10 +22,7 @@ from app.agents import (
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL not found in .env")
 
 
 # ---------------------------------------------------------
@@ -85,23 +82,27 @@ graph.add_edge("finalizer", END)
 # PostgreSQL
 # ---------------------------------------------------------
 
-pool = AsyncConnectionPool(
-    conninfo=DATABASE_URL,
-    kwargs={
-        "autocommit": True,
-        "row_factory": dict_row,
-    },
-    open=False,
-)
-
-
-
+pool = None
 checkpointer = None
 app = None
 
 
 async def initialize_database():
-    global checkpointer, app
+    global pool, checkpointer, app
+
+    database_url = os.getenv("DATABASE_URL")
+
+    if not database_url:
+        raise ValueError("DATABASE_URL not found in environment")
+
+    pool = AsyncConnectionPool(
+        conninfo=database_url,
+        kwargs={
+            "autocommit": True,
+            "row_factory": dict_row,
+        },
+        open=False,
+    )
 
     await pool.open()
 
@@ -116,8 +117,11 @@ async def initialize_database():
 
 
 async def close_database():
-    await pool.close()
+    global pool
 
+    if pool is not None:
+        await pool.close()
+        pool = None
 
 # ---------------------------------------------------------
 # Local test
