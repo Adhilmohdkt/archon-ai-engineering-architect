@@ -21,6 +21,8 @@ dependencies = [
      "deepeval",
      "httpx",
      "pytest",
+     'langgraph-checkpoint-postgres',
+     "psycopg[binary,pool]",
 ]
 [tool.setuptools.packages.find]
 include = ["app*", "mcp_server*"]

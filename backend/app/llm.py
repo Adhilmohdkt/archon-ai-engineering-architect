@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_mistralai import ChatMistralAI
 from langchain_cloudflare import ChatCloudflareWorkersAI
 from app.models import (SupervisorDecision,
@@ -8,6 +9,8 @@ from app.models import (SupervisorDecision,
                         Critique)
 
 load_dotenv()
+
+google_model = ChatGoogleGenerativeAI(model="gemini-2.5-flash",temperature=0,)
 
 groq_model = ChatGroq(
     model="openai/gpt-oss-120b",

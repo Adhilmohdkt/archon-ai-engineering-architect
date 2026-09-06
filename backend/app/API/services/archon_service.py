@@ -3,7 +3,7 @@ import uuid
 from langgraph.types import Command
 from app.API.schemas import ArchonResponse
 
-from app.graph import app
+from app import graph
 
 
 class ArchonService:
@@ -58,7 +58,7 @@ class ArchonService:
             }
         }
 
-        result = await app.ainvoke(
+        result = await graph.app.ainvoke(
             {
                 "user_goal": user_goal
             },
@@ -91,7 +91,7 @@ class ArchonService:
             }
         )
 
-        result = await app.ainvoke(
+        result = await graph.app.ainvoke(
             human_response,
             config=config
         )

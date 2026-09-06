@@ -1,5 +1,5 @@
 from app.llm import (supervisor_model,requirements_architecture_model,technologyrecommendations_model,
-                     cloudfare_model,critic_model,groq_model,mistral_model)
+                     cloudfare_model,critic_model,groq_model,mistral_model,google_model)
 from app.state import ArchonState
 from app.models import Critique
 from langgraph.types import (Command,interrupt)
@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage
 from mcp_server.mcp_tools import get_mcp_tools
 from langgraph.graph import END
 import asyncio
-MAX_REVISION = 3
+MAX_REVISION = 1
 
 def supervisor_node(state: ArchonState):
     print("Starting supervisor")
@@ -173,7 +173,7 @@ async def technology_node(state: ArchonState):
 
     tools = await get_mcp_tools()
 
-    model_with_tools = mistral_model.bind_tools(tools)
+    model_with_tools = google_model.bind_tools(tools)
 
     prompt = f"""
 You are Archon's Technology Recommendation Agent.
