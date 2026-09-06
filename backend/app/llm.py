@@ -1,36 +1,114 @@
+import os
+
 from dotenv import load_dotenv
+
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_mistralai import ChatMistralAI
 from langchain_cloudflare import ChatCloudflareWorkersAI
-from app.models import (SupervisorDecision,
-                        RequirementsArchitectureOutput,
-                        TechnologyRecommendations,
-                        Critique)
+
+from app.models import (
+    SupervisorDecision,
+    RequirementsArchitectureOutput,
+    TechnologyRecommendations,
+    Critique,
+)
 
 load_dotenv()
 
-google_model = ChatGoogleGenerativeAI(model="gemini-2.5-flash",temperature=0,)
 
-groq_model = ChatGroq(
-    model="openai/gpt-oss-120b",
-    temperature=0,
+# ---------------------------------------------------------
+# Groq
+# ---------------------------------------------------------
+
+groq_model = None
+
+if os.getenv("GROQ_API_KEY"):
+    groq_model = ChatGroq(
+        model="openai/gpt-oss-120b",
+        temperature=0,
+    )
+
+
+# ---------------------------------------------------------
+# Gemini
+# ---------------------------------------------------------
+
+google_model = None
+
+if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+    google_model = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        temperature=0,
+    )
+
+
+# ---------------------------------------------------------
+# Mistral
+# ---------------------------------------------------------
+
+mistral_model = None
+
+if os.getenv("MISTRAL_API_KEY"):
+    mistral_model = ChatMistralAI(
+        model="mistral-small-latest",
+        temperature=0,
+        max_tokens=4096,
+    )
+
+
+# ---------------------------------------------------------
+# Cloudflare
+# ---------------------------------------------------------
+
+cloudfare_model = None
+
+if os.getenv("CLOUDFLARE_API_TOKEN"):
+    cloudfare_model = ChatCloudflareWorkersAI(
+        model="@cf/google/gemma-4-26b-a4b-it",
+        temperature=0,
+        max_tokens=4096,
+    )
+
+
+# ---------------------------------------------------------
+# Structured models
+# ---------------------------------------------------------
+
+supervisor_model = (
+    groq_model.with_structured_output(
+        SupervisorDecision,
+        method="json_mode",
+    )
+    if groq_model
+    else None
 )
-mistral_model = ChatMistralAI(
-    model="mistral-small-latest",
-    temperature=0,
-    max_tokens=4096,
+
+
+requirements_architecture_model = (
+    cloudfare_model.with_structured_output(
+        RequirementsArchitectureOutput,
+    )
+    if cloudfare_model
+    else None
 )
 
-supervisor_model = groq_model.with_structured_output(SupervisorDecision,method="json_mode")
+
+technologyrecommendations_model = (
+    cloudfare_model.with_structured_output(
+        TechnologyRecommendations,
+        method="json_schema",
+    )
+    if cloudfare_model
+    else None
+)
 
 
-
-cloudfare_model = ChatCloudflareWorkersAI(model = "@cf/google/gemma-4-26b-a4b-it"
-                                      ,temperature = 0,max_tokens=4096)
-
-requirements_architecture_model = cloudfare_model.with_structured_output(RequirementsArchitectureOutput)
-
-technologyrecommendations_model = cloudfare_model.with_structured_output(TechnologyRecommendations,method='json_schema')
-
-critic_model = groq_model.with_structured_output(Critique,method = "json_schema")
+critic_model = (
+    groq_model.with_structured_output(
+        Critique,
+        method="json_schema",
+    )
+    if groq_model
+    else None
+)
