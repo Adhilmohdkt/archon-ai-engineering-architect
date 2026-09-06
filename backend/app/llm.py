@@ -63,7 +63,7 @@ if os.getenv("MISTRAL_API_KEY"):
 
 cloudfare_model = None
 
-if os.getenv("CLOUDFLARE_API_TOKEN"):
+if os.getenv("CF_AI_API_TOKEN"):
     cloudfare_model = ChatCloudflareWorkersAI(
         model="@cf/google/gemma-4-26b-a4b-it",
         temperature=0,

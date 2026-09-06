@@ -23,8 +23,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: pip install .
+        run: pip install -e .
 
       - name: Run tests
         working-directory: backend
-        run: pytest
+        run: python -m pytest
