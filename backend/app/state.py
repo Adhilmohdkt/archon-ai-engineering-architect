@@ -1,6 +1,12 @@
 from pydantic import BaseModel
 from typing import Literal
-from app.models import (TechnologyRecommendations,Critique,Requirements,Architecture)
+from app.models import (
+    TechnologyRecommendations,
+    Critique,
+    Requirements,
+    Architecture,
+    ArchitectureDiagram,
+)
 
 #==================== Main State ==============================
 
@@ -16,4 +22,5 @@ class ArchonState(BaseModel):
     human_decision: str | None = None
     human_feedback : str | None = None
     final_blueprint : str | None = None
+    diagram: ArchitectureDiagram | None = None
 

@@ -1,7 +1,7 @@
 from app.llm import (supervisor_model,requirements_architecture_model,technologyrecommendations_model,
-                     cloudfare_model,critic_model,groq_model,mistral_model,google_model)
+                     cloudfare_model,critic_model,groq_model,groq_tool_model,groq_structured_model,groq_diagram_model)
 from app.state import ArchonState
-from app.models import Critique
+from app.models import Critique, ArchitectureDiagram
 from langgraph.types import (Command,interrupt)
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import HumanMessage
@@ -172,222 +172,121 @@ async def technology_node(state: ArchonState):
     print("START: Technology")
 
     tools = await get_mcp_tools()
+    model_with_tools = groq_tool_model.bind_tools(tools)
 
-    model_with_tools = google_model.bind_tools(tools)
+    # Build only the context that is relevant to this run.
+    context_parts = [
+        f"User goal:\n{state.user_goal}",
+        f"Requirements:\n{state.requirements}",
+        f"Architecture:\n{state.architecture}",
+    ]
+
+    if state.technologyrecommendations:
+        context_parts.append(
+            f"Current technology recommendations:\n"
+            f"{state.technologyrecommendations}"
+        )
+
+    if state.critique:
+        context_parts.append(
+            f"Critic feedback:\n{state.critique}"
+        )
+
+    if state.human_feedback:
+        context_parts.append(
+            f"Human feedback:\n{state.human_feedback}"
+        )
+
+    context = "\n\n".join(context_parts)
 
     prompt = f"""
 You are Archon's Technology Recommendation Agent.
 
-The user's goal is:
+{context}
 
-{state.user_goal}
+Your task is to research and recommend technologies that best fit
+the requirements and proposed architecture.
 
-The identified requirements are:
+Evaluate:
+- functional and non-functional requirements
+- constraints
+- cost and operational complexity
+- scalability and maintainability
+- security and compliance
+- alternatives and important trade-offs
 
-{state.requirements}
-
-The proposed architecture is:
-
-{state.architecture}
-
-Current technology recommendations:
-
-{state.technologyrecommendations}
-
-Critic feedback:
-
-{state.critique}
-
-Human feedback:
-
-{state.human_feedback}
-
-
-Your job is to recommend appropriate technologies for this system.
-
-Consider:
-
-- The functional requirements
-- The non-functional requirements
-- The constraints
-- The proposed architecture
-- Cost and operational complexity
-- Scalability and maintainability
-- Security and compliance
-- Suitable alternatives and their trade-offs
-
-
-Revision handling:
-
-If Critic feedback is provided, this is a revision of the
-previous technology recommendations.
-
-Carefully analyze the Critic's feedback and address the issues
-identified by the Critic.
-
-Preserve valid technology choices where appropriate.
-Do not replace technologies unnecessarily.
-
-
-Human feedback handling:
-
-If Human feedback is provided, treat it as additional guidance
-from a human reviewer.
-
-The human may suggest:
-
-- A specific technology
-- An alternative technology
-- A change to the architecture
-- A constraint or preference
-- A concern about cost, security, scalability, or implementation
-
-Carefully evaluate the human's suggestion against:
-
-- The user's goal
-- The requirements
-- The architecture
-- The constraints
-- The Critic's feedback
-- Technical feasibility
-
-Do not blindly accept the human's suggestion.
-
-If the suggestion is technically appropriate, incorporate it
-into the technology recommendations.
-
-If the suggestion conflicts with the requirements, constraints,
-architecture, or technical correctness, do not blindly follow it.
-Use your technical reasoning to determine the appropriate solution.
-
-If Human feedback is None, continue normally without human guidance.
-
-
-If no Critic feedback is provided, this is the initial technology
-recommendation.
-
-If no Human feedback is provided, this is not a human-guided
-revision.
-
+Revision rules:
+- If critic feedback exists, address it.
+- Preserve valid existing choices unless there is a reason to change them.
+- If human feedback exists, evaluate it technically rather than
+  accepting it blindly.
+- Change only what is necessary during a revision.
 
 Web research:
+You MUST use the available web/MCP search tool before making
+recommendations. Use current information about technologies,
+capabilities, limitations, pricing, or trade-offs.
 
-Before making technology recommendations, you MUST use the
-websearch tool to research current technology options,
-capabilities, limitations, or trade-offs.
-
-You must perform at least one web search before producing
-your recommendations.
-
-Do not recommend technologies simply because they are popular.
-
-Choose technologies based on the specific requirements,
-architecture, constraints, human guidance, and current
-information.
+Keep the final analysis concise.
+Focus on technology decisions and evidence needed to justify them.
+Do not write a long general explanation.
 """
 
     messages = [HumanMessage(content=prompt)]
 
     response = await model_with_tools.ainvoke(messages)
 
+    # Execute MCP/web tools when requested by the model.
     if response.tool_calls:
 
         tool_node = ToolNode(tools)
 
         messages.append(response)
 
-        tool_result = await tool_node.ainvoke({
-            "messages": messages
-        })
+        tool_result = await tool_node.ainvoke(
+            {
+                "messages": messages
+            }
+        )
 
         messages.extend(tool_result["messages"])
 
-        # Give the search results back to the LLM
+        # Produce the final research analysis using the tool results.
         response = await model_with_tools.ainvoke(messages)
 
-
-    # Convert only the final technology response into our schema
+    # Only the research result is needed by the formatter.
     structured_prompt = f"""
-You are the final Technology Recommendation formatter for Archon.
-
-Convert the technology recommendation produced by the previous agent
-into a complete JSON object that strictly follows the
+Convert the following technology research into the
 TechnologyRecommendations schema.
 
-User goal:
-{state.user_goal}
-
-Requirements:
-{state.requirements}
-
-Architecture:
-{state.architecture}
-
-Critic feedback:
-{state.critique}
-
-Human feedback:
-{state.human_feedback}
-
-Technology recommendation produced after research:
+Technology research:
 {response.content}
 
+Requirements for the output:
 
-The output MUST be a JSON object with EXACTLY these required fields:
+- recommendations: technology choices for the major architecture
+  components.
+- alternatives: provide up to 2 relevant alternatives for each
+  important choice.
+- trade_offs: give one concise sentence for each important trade-off.
+- reason: give a concise overall justification in no more than
+  3 sentences.
+- Include all four fields.
+- Do not invent technologies that are unsupported by the research,
+  requirements, or architecture.
 
-{{
-    "recommendations": {{
-        "technology_or_component": "recommended technology"
-    }},
-    "alternatives": {{
-        "technology_or_component": [
-            "alternative 1",
-            "alternative 2"
-        ]
-    }},
-    "trade_offs": {{
-        "technology_or_component": "trade-offs of the recommendation versus alternatives"
-    }},
-    "reason": "overall explanation for why these technologies are appropriate"
-}}
-
-ALL FOUR fields are mandatory:
-
-1. recommendations
-   - Provide the recommended technology for each major system component.
-
-2. alternatives
-   - Provide reasonable alternatives for the relevant technology choices.
-
-3. trade_offs
-   - Explain the important trade-offs for the technology decisions.
-   - This field MUST NOT be omitted.
-
-4. reason
-   - Explain why the recommended technologies are appropriate for
-     the user's requirements and architecture.
-   - This field MUST NOT be omitted.
-
-Do not return only recommendations and alternatives.
-
-Even if the research response does not explicitly contain trade-offs
-or a reason, derive them from the requirements, architecture,
-constraints, and researched technology information.
-
-If Critic feedback is present, ensure the recommendations address
-the issues identified by the Critic.
-
-If Human feedback is present, consider it carefully, but do not
-blindly accept suggestions that conflict with requirements,
-constraints, architecture, or technical correctness.
-
-Return ONLY the complete JSON object.
-Do not return explanations, Markdown, code fences, or additional text.
+Return ONLY the structured TechnologyRecommendations object.
 """
 
-    result = await technologyrecommendations_model.ainvoke(
-        structured_prompt
-    )
+    try:
+     result = await technologyrecommendations_model.ainvoke(
+            structured_prompt
+        )
+    except Exception as e:
+        print("=== TECHNOLOGY FORMATTER FAILED ===")
+        print(type(e).__name__)
+        print(str(e))
+        raise
 
     print("Technology recommendations generated")
 
@@ -395,7 +294,6 @@ Do not return explanations, Markdown, code fences, or additional text.
         update={
             "technologyrecommendations": result,
             "critique": None,
-        
         },
         goto="supervisor",
     )
@@ -761,4 +659,62 @@ def human_node(state: ArchonState):
             "Invalid human decision. "
             "Expected 'approve', 'revise', or 'reject'."
         )
- 
+
+def diagram_node(state: ArchonState):
+
+    print("Diagram Agent")
+
+    prompt = f"""
+You are a diagram extraction agent.
+
+Convert the approved Final Blueprint below into an architecture
+diagram represented by the provided structured output schema.
+
+FINAL BLUEPRINT:
+{state.final_blueprint}
+
+RULES:
+
+1. Extract only architecture components explicitly present in the
+   Final Blueprint.
+
+2. Do not invent new architecture components.
+
+3. Every node must have:
+   - id
+   - label
+   - type
+
+4. Every edge must have:
+   - source
+   - target
+   - label
+
+5. Every edge source and target must exactly match an existing node id.
+
+6. Do not create duplicate nodes.
+
+7. Do not create self-referencing edges.
+
+8. Represent the important data flows described in the blueprint.
+
+9. Keep the diagram simple and readable.
+
+10. Use the exact field names defined by the schema.
+    For edges, the required fields are exactly:
+    "source", "target", and "label".
+
+11. Return ONLY the structured ArchitectureDiagram object.
+"""
+
+    result = groq_diagram_model.with_structured_output(
+    ArchitectureDiagram,
+    method="json_schema",
+    strict=True,
+        ).invoke(prompt) 
+
+    print("Architecture Diagram generated")
+
+    return {
+        "diagram": result
+    }

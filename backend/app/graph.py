@@ -16,13 +16,12 @@ from app.agents import (
     technology_node,
     critic_node,
     finalizer_node,
+    diagram_node,
     human_node,
 )
 
 
 load_dotenv()
-
-
 
 
 # ---------------------------------------------------------
@@ -64,6 +63,11 @@ graph.add_node(
 )
 
 graph.add_node(
+    "diagram",
+    diagram_node,
+)
+
+graph.add_node(
     "human",
     human_node,
     destinations=(
@@ -74,8 +78,14 @@ graph.add_node(
     ),
 )
 
+
 graph.add_edge(START, "supervisor")
-graph.add_edge("finalizer", END)
+
+# Finalizer now passes its output to the Diagram Agent
+graph.add_edge("finalizer", "diagram")
+
+# Diagram Agent is the final step
+graph.add_edge("diagram", END)
 
 
 # ---------------------------------------------------------
@@ -102,13 +112,16 @@ async def initialize_database():
             "row_factory": dict_row,
         },
         open=False,
+        check=AsyncConnectionPool.check_connection,
+        max_idle=300,
+        max_lifetime=1800,
     )
 
     await pool.open()
 
     checkpointer = AsyncPostgresSaver(pool)
 
-    # Creates LangGraph checkpoint tables if needed.
+    
     await checkpointer.setup()
 
     app = graph.compile(
@@ -122,6 +135,7 @@ async def close_database():
     if pool is not None:
         await pool.close()
         pool = None
+
 
 # ---------------------------------------------------------
 # Local test
@@ -139,33 +153,16 @@ async def test_graph():
 
         config = {
             "configurable": {
-                "thread_id": "archon-test-1"
+                "thread_id": "archon-test-2"
             }
         }
 
-        # First run
         result = await app.ainvoke(
             initial_state,
             config=config,
         )
 
         print("Graph paused for human review")
-
-        # Resume with human decision
-        human_response = Command(
-            resume={
-                "decision": "revise",
-                "feedback": (
-                    "Add API operations for viewing, deleting, "
-                    "filtering, and summarizing expenses."
-                ),
-            }
-        )
-
-        result = await app.ainvoke(
-            human_response,
-            config=config,
-        )
 
         print(result)
 

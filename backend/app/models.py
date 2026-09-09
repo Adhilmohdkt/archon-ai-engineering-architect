@@ -57,3 +57,22 @@ class Critique(BaseModel):
     issues: list[str]
     target_agent: Literal["requirements", "technology"] | None
     revision_required: bool
+
+
+# ------------------------- Architecture Diagram --------------------
+
+class DiagramNode(BaseModel):
+    id: str
+    label: str
+    type: str
+
+
+class DiagramEdge(BaseModel):
+    source: str
+    target: str
+    label: str | None = None
+
+
+class ArchitectureDiagram(BaseModel):
+    nodes: list[DiagramNode]
+    edges: list[DiagramEdge]
