@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_cloudflare import ChatCloudflareWorkersAI
-from  langchain_nvidia_ai_endpoints import ChatNVIDIA
 
 from app.models import (
     SupervisorDecision,
