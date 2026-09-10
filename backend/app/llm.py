@@ -42,7 +42,7 @@ groq_structured_model = ChatGroq(
 )
 
 groq_diagram_model = ChatGroq(
-    model="openai/gpt-oss-20b",
+    model="openai/gpt-oss-120b",
     temperature=0,
    
 
@@ -100,10 +100,10 @@ requirements_architecture_model = (
 
 
 technologyrecommendations_model = (
-    groq_structured_model.with_structured_output(
+    google_model.with_structured_output(
         TechnologyRecommendations,
         method="json_schema",
-        strict=True
+        
     )
     if cloudfare_model
     else None

@@ -172,6 +172,8 @@ async def technology_node(state: ArchonState):
     print("START: Technology")
 
     tools = await get_mcp_tools()
+
+    # The Technology Agent must perform web research.
     model_with_tools = groq_tool_model.bind_tools(tools)
 
     # Build only the context that is relevant to this run.
@@ -223,44 +225,97 @@ Revision rules:
 - Change only what is necessary during a revision.
 
 Web research:
-You MUST use the available web/MCP search tool before making
-recommendations. Use current information about technologies,
-capabilities, limitations, pricing, or trade-offs.
+You MUST use the websearch tool before making recommendations.
 
-Keep the final analysis concise.
-Focus on technology decisions and evidence needed to justify them.
-Do not write a long general explanation.
+Research the technologies, capabilities, limitations, pricing,
+security considerations, scalability characteristics, or trade-offs
+that are relevant to the current requirements and feedback.
+
+If this is a revision, specifically research the areas raised by the
+critic or human feedback.
+
+After completing the research, the results will be analyzed separately.
+
+Do not provide the final technology recommendations yet.
+Your immediate task is to perform the required web research.
 """
 
     messages = [HumanMessage(content=prompt)]
 
+    # ---------------------------------------------------------
+    # 1. REQUIRED WEB RESEARCH
+    # ---------------------------------------------------------
+
     response = await model_with_tools.ainvoke(messages)
 
-    # Execute MCP/web tools when requested by the model.
-    if response.tool_calls:
-
-        tool_node = ToolNode(tools)
-
-        messages.append(response)
-
-        tool_result = await tool_node.ainvoke(
-            {
-                "messages": messages
-            }
+    if not response.tool_calls:
+        raise RuntimeError(
+            "Technology Agent failed to perform required web research."
         )
 
-        messages.extend(tool_result["messages"])
+    print(
+        "Technology research tool calls:",
+        [call["name"] for call in response.tool_calls],
+    )
 
-        # Produce the final research analysis using the tool results.
-        response = await model_with_tools.ainvoke(messages)
+    messages.append(response)
 
-    # Only the research result is needed by the formatter.
+    tool_node = ToolNode(tools)
+
+    tool_result = await tool_node.ainvoke(
+        {
+            "messages": messages
+        }
+    )
+
+    messages.extend(tool_result["messages"])
+
+    # ---------------------------------------------------------
+    # 2. ANALYZE THE RESEARCH
+    # ---------------------------------------------------------
+
+    analysis_prompt = HumanMessage(
+        content="""
+Analyze the web research results above and produce a concise
+technology research analysis.
+
+Use the research evidence to determine:
+- appropriate technology choices
+- relevant alternatives
+- important trade-offs
+- security considerations
+- scalability and reliability considerations
+- cost and operational considerations
+
+If this is a revision, explicitly address the critic and human
+feedback included in the context.
+
+Do not invent information that is not supported by the research,
+requirements, architecture, or feedback.
+
+Focus only on technology decisions and the evidence supporting them.
+"""
+    )
+
+    messages.append(analysis_prompt)
+
+    # IMPORTANT:
+    # Do NOT use research_model here because it requires another
+    # tool call. This call should analyze the research results.
+    analysis_response = await groq_tool_model.ainvoke(messages)
+
+    research = analysis_response.content
+
+    # ---------------------------------------------------------
+    # 3. STRUCTURED TECHNOLOGY OUTPUT
+    # ---------------------------------------------------------
+
     structured_prompt = f"""
 Convert the following technology research into the
 TechnologyRecommendations schema.
 
 Technology research:
-{response.content}
+{research}
 
 Requirements for the output:
 
@@ -279,9 +334,10 @@ Return ONLY the structured TechnologyRecommendations object.
 """
 
     try:
-     result = await technologyrecommendations_model.ainvoke(
+        result = await technologyrecommendations_model.ainvoke(
             structured_prompt
         )
+
     except Exception as e:
         print("=== TECHNOLOGY FORMATTER FAILED ===")
         print(type(e).__name__)
@@ -519,14 +575,13 @@ The response must be a valid JSON object.
 
 
     if result.revision_required:
+      return Command(
+        update={
+            "critique": result,
+        },
+        goto="supervisor",
 
-        return Command(
-            update={
-                "critique": result,
-                "revision_count": state.revision_count + 1,
-            },
-            goto="supervisor",
-        )
+      )
 
     return Command(
         update={
@@ -710,7 +765,7 @@ RULES:
     result = groq_diagram_model.with_structured_output(
     ArchitectureDiagram,
     method="json_schema",
-    strict=True,
+   
         ).invoke(prompt) 
 
     print("Architecture Diagram generated")
